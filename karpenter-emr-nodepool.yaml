@@ -1,0 +1,112 @@
+apiVersion: karpenter.sh/v1beta1
+kind: NodePool
+metadata:
+  name: emr
+spec:
+  # Template section that describes how to template out NodeClaim resources that Karpenter will provision
+  # Karpenter will consider this template to be the minimum requirements needed to provision a Node using this NodePool
+  # It will overlay this NodePool with Pods that need to schedule to further constrain the NodeClaims
+  # Karpenter will provision to launch new Nodes for the cluster
+  template:
+    metadata:
+      labels:
+        app: emr
+    spec:
+      # References the Cloud Provider's NodeClass resource, see your cloud provider specific documentation
+      nodeClassRef:
+        apiVersion: karpenter.k8s.aws/v1beta1
+        kind: EC2NodeClass
+        name: emr
+
+      # Requirements that constrain the parameters of provisioned nodes.
+      # These requirements are combined with pod.spec.topologySpreadConstraints, pod.spec.affinity.nodeAffinity, pod.spec.affinity.podAffinity, and pod.spec.nodeSelector rules.
+      # Operators { In, NotIn, Exists, DoesNotExist, Gt, and Lt } are supported.
+      # https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#operators
+      requirements:
+        - key: "karpenter.k8s.aws/instance-category"
+          operator: In
+          values: ["r"]
+        - key: "karpenter.k8s.aws/instance-cpu"
+          operator: In
+          values: ["4", "8", "16", "32"]
+        - key: "karpenter.k8s.aws/instance-hypervisor"
+          operator: In
+          values: ["nitro"]
+        - key: "karpenter.k8s.aws/instance-generation"
+          operator: Gt
+          values: ["2"]
+        - key: "kubernetes.io/arch"
+          operator: In
+          values: ["arm64"]
+        - key: "topology.kubernetes.io/zone"
+          operator: In
+          values: ["${DEFAULT_AZ}"]
+        - key: "karpenter.sh/capacity-type"
+          operator: In
+          values: ["spot"]
+        - key: app/emr
+          operator: Exists
+
+  # Disruption section which describes the ways in which Karpenter can disrupt and replace Nodes
+  # Configuration in this section constrains how aggressive Karpenter can be with performing operations
+  # like rolling Nodes due to them hitting their maximum lifetime (expiry) or scaling down nodes to reduce cluster cost
+  disruption:
+    # Describes which types of Nodes Karpenter should consider for consolidation
+    # If using 'WhenUnderutilized', Karpenter will consider all nodes for consolidation and attempt to remove or replace Nodes when it discovers that the Node is underutilized and could be changed to reduce cost
+    # If using `WhenEmpty`, Karpenter will only consider nodes for consolidation that contain no workload pods
+    consolidationPolicy: WhenEmpty
+
+    # The amount of time Karpenter should wait after discovering a consolidation decision
+    # This value can currently only be set when the consolidationPolicy is 'WhenEmpty'
+    # You can choose to disable consolidation entirely by setting the string value 'Never' here
+    consolidateAfter: 30s
+
+    # The amount of time a Node can live on the cluster before being removed
+    # Avoiding long-running Nodes helps to reduce security vulnerabilities as well as to reduce the chance of issues that can plague Nodes with long uptimes such as file fragmentation or memory leaks from system processes
+    # You can choose to disable expiration entirely by setting the string value 'Never' here
+    expireAfter: 720h
+
+  # Resource limits constrain the total size of the pool.
+  # Limits prevent Karpenter from creating new instances once the limit is exceeded.
+  limits:
+    cpu: "1000"
+    memory: 1000Gi
+
+  # Priority given to the NodePool when the scheduler considers which NodePool
+  # to select. Higher weights indicate higher priority when comparing NodePools.
+  # Specifying no weight is equivalent to specifying a weight of 0.
+  weight: 5
+
+---
+apiVersion: karpenter.k8s.aws/v1beta1
+kind: EC2NodeClass
+metadata:
+  name: emr
+spec:
+  # Required, resolves a default ami and userdata
+  amiFamily: AL2
+  role: KarpenterNodeRole-${CLUSTER_NAME}
+  # Required, discovers subnets to attach to instances
+  # Each term in the array of subnetSelectorTerms is ORed together
+  # Within a single term, all conditions are ANDed
+  subnetSelectorTerms:
+    # Select on any subnet that has the "karpenter.sh/discovery: ${CLUSTER_NAME}"
+    # AND the "environment: test" tag OR any subnet with ID "subnet-09fa4a0a8f233a921"
+    - tags:
+        karpenter.sh/discovery: ${CLUSTER_NAME}
+
+  # Required, discovers security groups to attach to instances
+  # Each term in the array of securityGroupSelectorTerms is ORed together
+  # Within a single term, all conditions are ANDed
+  securityGroupSelectorTerms:
+    # Select on any security group that has both the "karpenter.sh/discovery: ${CLUSTER_NAME}" tag
+    # AND the "environment: test" tag OR any security group with the "my-security-group" name
+    # OR any security group with ID "sg-063d7acfb4b06c82c"
+    - tags:
+        karpenter.sh/discovery: ${CLUSTER_NAME}
+
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 1000Gi
+        volumeType: gp3
