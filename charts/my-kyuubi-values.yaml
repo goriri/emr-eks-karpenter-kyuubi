@@ -1,0 +1,196 @@
+# // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# // SPDX-License-Identifier: MIT-0
+# Kyuubi server numbers
+replicaCount: 2
+image:
+  repository: $ECR_URL/kyuubi-emr-eks
+  tag: "6.10_180"
+  pullPolicy: IfNotPresent
+
+# priorityClass used for Kyuubi server pod
+priorityClass:
+  create: false
+  name: ~
+
+# ServiceAccount used for Kyuubi create/list/delete pod in EMR on EKS namespace "emr"
+# SA was created by scirpts/eks_provision.sh, update the script if needed
+serviceAccount:
+  create: false
+  name: kyuubi
+
+# Allow Kyuubi create Spark Engine & pods in a different namespace "emr"
+engine:
+  namespace: emr
+
+# the rbac role will be created in "emr" namespace  
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["services", "configmaps", "serviceaccounts", "pods"]
+      verbs: ["get", "list", "describe", "create", "edit", "delete", "annotate", "patch", "label", "watch"]
+    - apiGroups: [""]
+      resources: ["persistentvolumeclaims"]
+      verbs:  ["create", "list", "delete"]
+    - apiGroups: ["rbac.authorization.k8s.io"]
+      resources: ["roles", "rolebindings"]
+      verbs: ["get", "list", "describe", "create", "edit", "delete", "annotate", "patch", "label"]  
+
+server:
+  # Thrift Binary protocol (HiveServer2 compatible)
+  thriftBinary:
+    enabled: true
+    port: 10009
+    service:
+      type: ClusterIP
+      port: "{{ .Values.server.thriftBinary.port }}"
+      annotations: {}
+
+  # Thrift HTTP protocol (HiveServer2 compatible)
+  thriftHttp:
+    enabled: false
+    port: 10010
+    service:
+      type: ClusterIP
+      port: "{{ .Values.server.thriftHttp.port }}"
+      annotations: {}
+
+  # REST API protocol (experimental)
+  rest:
+    enabled: true
+    port: 10099
+    service:
+      type: ClusterIP
+      port: "{{ .Values.server.rest.port }}"
+      annotations: {}
+
+  # MySQL compatible text protocol (experimental)
+  mysql:
+    enabled: false
+    port: 3309
+    service:
+      type: ClusterIP
+      port: "{{ .Values.server.mysql.port }}"
+  
+monitoring:
+  # Exposes metrics in Prometheus format
+  prometheus:
+    enabled: false
+kyuubiConfDir: /opt/kyuubi/conf
+kyuubiConf:
+  kyuubiEnv: |
+    #!/usr/bin/env bash
+    export SPARK_HOME=/usr/lib/spark
+    export KYUUBI_WORK_DIR_ROOT=/usr/lib/kyuubi/work
+    export HADOOP_CONF_DIR=/etc/hadoop/conf
+    export JAVA_HOME=/etc/alternatives/jre
+    export SPARK_CONF_DIR=/etc/spark/conf
+  kyuubiDefaults: ~
+  # kyuubiDefaults: |
+    # Authentication (client users)
+    # kyuubi.authentication                                         LDAP
+    # kyuubi.authentication.ldap.url                                $LDAP_URL
+    # kyuubi.authentication.ldap.base.dn                            $LDAP_BASE_USER_DN
+    # kyuubi.authentication.ldap.guidKey                            $LDAP_USER_ATTR
+
+# $SPARK_CONF_DIR directory
+sparkConfDir: /etc/spark/conf
+sparkConf:
+  sparkEnv: |
+    #!/usr/bin/env bash
+    export SPARK_HOME=${SPARK_HOME:-/usr/lib/spark}
+    export SPARK_LOG_DIR=${SPARK_LOG_DIR:-/var/log/spark}
+    export HADOOP_HOME=${HADOOP_HOME:-/usr/lib/hadoop}
+    export HADOOP_CONF_DIR=${HADOOP_CONF_DIR:-/etc/hadoop/conf}
+    export HIVE_CONF_DIR=${HIVE_CONF_DIR:-/etc/hive/conf}
+
+    export SPARK_MASTER_PORT=7077
+    export SPARK_MASTER_IP=$STANDALONE_SPARK_MASTER_HOST
+    export SPARK_MASTER_WEBUI_PORT=8080
+
+    export SPARK_WORKER_DIR=${SPARK_WORKER_DIR:-/var/run/spark/work}
+    export SPARK_WORKER_PORT=7078
+    export SPARK_WORKER_WEBUI_PORT=8081
+
+    export HIVE_SERVER2_THRIFT_BIND_HOST=0.0.0.0
+    export HIVE_SERVER2_THRIFT_PORT=10001
+
+
+    export SPARK_DAEMON_JAVA_OPTS="$SPARK_DAEMON_JAVA_OPTS -XX:OnOutOfMemoryError='kill -9 %p'"
+    export PYSPARK_PYTHON=/usr/bin/python3
+    export PYSPARK_DRIVER_PYTHON=/usr/bin/python3
+
+    export AWS_STS_REGIONAL_ENDPOINTS=regional
+  sparkDefaults: |
+    spark.submit.deployMode=cluster
+    spark.kubernetes.namespace=emr
+    spark.kubernetes.authenticate.serviceAccountName=cross-ns-kyuubi
+    spark.kubernetes.authenticate.driver.serviceAccountName=emr-kyuubi
+    spark.kubernetes.container.image=public.ecr.aws/emr-on-eks/spark/emr-6.10.0:latest
+    spark.kubernetes.driver.container.image=public.ecr.aws/emr-on-eks/spark/emr-6.10.0:latest
+    spark.master=k8s://https://kubernetes.default.svc:443
+    spark.hadoop.fs.s3.impl=com.amazon.ws.emr.hadoop.fs.EmrFileSystem
+    spark.hadoop.hive.metastore.client.factory.class=com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory
+    spark.driver.extraClassPath=/usr/lib/hadoop-lzo/lib/*:/usr/lib/hadoop/hadoop-aws.jar:/usr/share/aws/aws-java-sdk/*:/usr/share/aws/emr/emrfs/conf:/usr/share/aws/emr/emrfs/lib/*:/usr/share/aws/emr/emrfs/auxlib/*:/usr/share/aws/emr/goodies/lib/emr-spark-goodies.jar:/usr/share/aws/emr/security/conf:/usr/share/aws/emr/security/lib/*:/usr/share/aws/hmclient/lib/aws-glue-datacatalog-spark-client.jar:/usr/share/java/Hive-JSON-Serde/hive-openx-serde.jar:/usr/share/aws/sagemaker-spark-sdk/lib/sagemaker-spark-sdk.jar:/usr/share/aws/emr/s3select/lib/emr-s3-select-spark-connector.jar:/docker/usr/lib/hadoop-lzo/lib/*:/docker/usr/lib/hadoop/hadoop-aws.jar:/docker/usr/share/aws/aws-java-sdk/*:/docker/usr/share/aws/emr/emrfs/conf:/docker/usr/share/aws/emr/emrfs/lib/*:/docker/usr/share/aws/emr/emrfs/auxlib/*:/docker/usr/share/aws/emr/goodies/lib/emr-spark-goodies.jar:/docker/usr/share/aws/emr/security/conf:/docker/usr/share/aws/emr/security/lib/*:/docker/usr/share/aws/hmclient/lib/aws-glue-datacatalog-spark-client.jar:/docker/usr/share/java/Hive-JSON-Serde/hive-openx-serde.jar:/docker/usr/share/aws/sagemaker-spark-sdk/lib/sagemaker-spark-sdk.jar:/docker/usr/share/aws/emr/s3select/lib/emr-s3-select-spark-connector.jar:/usr/share/aws/redshift/jdbc/RedshiftJDBC.jar:/usr/share/aws/redshift/spark-redshift/lib/*
+    spark.driver.extraLibraryPath=/usr/lib/hadoop/lib/native:/usr/lib/hadoop-lzo/lib/native:/docker/usr/lib/hadoop/lib/native:/docker/usr/lib/hadoop-lzo/lib/native
+    spark.executor.extraClassPath=/usr/lib/hadoop-lzo/lib/*:/usr/lib/hadoop/hadoop-aws.jar:/usr/share/aws/aws-java-sdk/*:/usr/share/aws/emr/emrfs/conf:/usr/share/aws/emr/emrfs/lib/*:/usr/share/aws/emr/emrfs/auxlib/*:/usr/share/aws/emr/goodies/lib/emr-spark-goodies.jar:/usr/share/aws/emr/security/conf:/usr/share/aws/emr/security/lib/*:/usr/share/aws/hmclient/lib/aws-glue-datacatalog-spark-client.jar:/usr/share/java/Hive-JSON-Serde/hive-openx-serde.jar:/usr/share/aws/sagemaker-spark-sdk/lib/sagemaker-spark-sdk.jar:/usr/share/aws/emr/s3select/lib/emr-s3-select-spark-connector.jar:/docker/usr/lib/hadoop-lzo/lib/*:/docker/usr/lib/hadoop/hadoop-aws.jar:/docker/usr/share/aws/aws-java-sdk/*:/docker/usr/share/aws/emr/emrfs/conf:/docker/usr/share/aws/emr/emrfs/lib/*:/docker/usr/share/aws/emr/emrfs/auxlib/*:/docker/usr/share/aws/emr/goodies/lib/emr-spark-goodies.jar:/docker/usr/share/aws/emr/security/conf:/docker/usr/share/aws/emr/security/lib/*:/docker/usr/share/aws/hmclient/lib/aws-glue-datacatalog-spark-client.jar:/docker/usr/share/java/Hive-JSON-Serde/hive-openx-serde.jar:/docker/usr/share/aws/sagemaker-spark-sdk/lib/sagemaker-spark-sdk.jar:/docker/usr/share/aws/emr/s3select/lib/emr-s3-select-spark-connector.jar:/usr/share/aws/redshift/jdbc/RedshiftJDBC.jar:/usr/share/aws/redshift/spark-redshift/lib/*
+    spark.executor.extraLibraryPath=/usr/lib/hadoop/lib/native:/usr/lib/hadoop-lzo/lib/native:/docker/usr/lib/hadoop/lib/native:/docker/usr/lib/hadoop-lzo/lib/native
+    spark.eventLog.enabled=true
+    spark.eventLog.dir=file:///var/log/spark/apps
+    spark.history.fs.logDirectory=file:///var/log/spark/apps
+    spark.history.ui.port=18080
+    spark.blacklist.decommissioning.enabled=true
+    spark.blacklist.decommissioning.timeou=1h
+    spark.resourceManager.cleanupExpiredHost=true
+    spark.stage.attempt.ignoreOnDecommissionFetchFailure=true
+    spark.decommissioning.timeout.threshold=20
+    spark.files.fetchFailure.unRegisterOutputOnHost=true
+    spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version.emr_internal_use_only.EmrFileSystem=2
+    spark.hadoop.mapreduce.fileoutputcommitter.cleanup-failures.ignored.emr_internal_use_only.EmrFileSystem=true
+    spark.hadoop.fs.s3.getObject.initialSocketTimeoutMilliseconds=2000
+    spark.sql.parquet.output.committer.class=com.amazon.emr.committer.EmrOptimizedSparkSqlParquetOutputCommitter
+    spark.sql.parquet.fs.optimized.committer.optimization-enabled=true
+    spark.sql.emr.internal.extensions=com.amazonaws.emr.spark.EmrSparkSessionExtensions
+    spark.executor.memory=1G
+    spark.executor.cores=1
+    spark.driver.memory=1G
+    spark.driver.cores=1
+    spark.executor.defaultJavaOptions=-verbose:gc -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+UseParallelGC -XX:InitiatingHeapOccupancyPercent=70 -XX:OnOutOfMemoryError='kill -9 %p'
+    spark.driver.defaultJavaOptions=-XX:OnOutOfMemoryError='kill -9 %p' -XX:+UseParallelGC -XX:InitiatingHeapOccupancyPercent=70
+    spark.hadoop.fs.defaultFS=file:///
+    spark.shuffle.service.enabled=false
+    spark.dynamicAllocation.enabled=false
+    spark.kubernetes.container.image.pullPolicy=IfNotPresent
+    spark.kubernetes.pyspark.pythonVersion=3
+    spark.hadoop.fs.s3.customAWSCredentialsProvider=com.amazonaws.auth.WebIdentityTokenCredentialsProvider
+    spark.hadoop.dynamodb.customAWSCredentialsProvider=com.amazonaws.auth.WebIdentityTokenCredentialsProvider
+    spark.authenticate=true
+    spark.kubernetes.driver.podTemplateFile=s3://${S3_BUCKET}/pod-template/driver-pod-template.yaml
+    spark.kubernetes.executor.podTemplateFile=s3:/${S3_BUCKET}/pod-template/executor-pod-template.yaml
+    spark.kubernetes.driver.podTemplateContainerName=spark-kubernetes-driver
+    spark.kubernetes.executor.podTemplateContainerName=spark-kubernetes-executor
+    spark.kubernetes.file.upload.path=s3://${S3_BUCKET}upload_files/
+
+  log4j2: |
+    rootLogger.level=debug
+    rootLogger.appenderRef.stdout.ref=STDOUT
+    # Console Appender
+    appender.console.type=Console
+    appender.console.name=STDOUT
+    appender.console.target=SYSTEM_OUT
+    appender.console.layout.type=PatternLayout
+    appender.console.layout.pattern=%d{HH:mm:ss.SSS} %p %c: %m%n
+    appender.console.filter.1.type=Filters
+    appender.console.filter.1.a.type=ThresholdFilter
+    appender.console.filter.1.a.level=info
+    # Set the default kyuubi-ctl log level to WARN. When running the kyuubi-ctl, the
+    # log level for this class is used to overwrite the root logger's log level.
+    logger.ctl.name=org.apache.kyuubi.ctl.ServiceControlCli
+    logger.ctl.level=error
+    # Kyuubi BeeLine
+    logger.beeline.name = org.apache.hive.beeline.KyuubiBeeLine
+    logger.beeline.level = error
+livenessProbe:
+  enabled: true
+readinessProbe:
+  enabled: true

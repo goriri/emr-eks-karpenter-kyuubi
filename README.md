@@ -22,7 +22,7 @@ export JOB_EXECUTION_ROLE_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/${JOB_EXECUTIO
 
 export S3_BUCKET="YOUR_BUCKET"
 export EMR_NAMESPACE=emr
-export KYUUBI_NAMESPACE=kyuubi
+<!-- export KYUUBI_NAMESPACE=kyuubi -->
 export KYUUBI_SA=emr-kyuubi
 
 chmod +x job-execution-role.sh
@@ -48,12 +48,26 @@ envsubst < karpenter-emr-nodepool.yaml | kubectl apply -f -
 Please replace the EMRCLUSTER_ID with your EMR virtual cluster ID
 ```
 export EMRCLUSTER_ID=ekjfutq5yadjc6626hmptqiq1
-chmod +x start-job-run-test.sh
-./start-job-run-test.sh
+chmod +x start-job-run.sh
+./start-job-run.sh
 ```
 
-## Step 5 Create Pod Templates
+## Step 5 Create Pod Templates and Test
+In the pod template, we will add node selection to run EMR workloads only on nodes labeled `app=emr` and let 
 ```
 aws s3 cp driver-pod-template.yaml s3://${S3_BUCKET}/pod-template/
 aws s3 cp executor-pod-template.yaml s3://${S3_BUCKET}/pod-template/
+
+chmod +x start-job-run-pod-template.sh
+./start-job-run-pod-template.sh
+```
+
+## Step 6 Create Kyuubi Image and Deploy
+```
+export ECR_URL=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+chmod build-kyuubi-docker.sh
+./build-kyuubi-docker.sh
+
+envsubst < charts/my-kyuubi-values.yaml | helm install kyuubi charts/kyuubi -n emr --create-namespace -f - --debug
+kubectl get pods -n emr
 ```

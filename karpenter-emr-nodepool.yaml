@@ -109,7 +109,7 @@ spec:
     # Root device
     - deviceName: /dev/xvda
       ebs:
-        volumeSize: 20Gi
+        volumeSize: 100Gi
         volumeType: gp3
     # Data device: Container resources such as images and logs
     - deviceName: /dev/sdb
