@@ -106,7 +106,29 @@ spec:
         karpenter.sh/discovery: ${CLUSTER_NAME}
 
   blockDeviceMappings:
+    # Root device
     - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 20Gi
+        volumeType: gp3
+    # Data device: Container resources such as images and logs
+    - deviceName: /dev/sdb
       ebs:
         volumeSize: 1000Gi
         volumeType: gp3
+  userData: |
+    #!/bin/bash
+    echo "Running a custom user data script to format the additional disks"
+    set -ex
+    # Assuming the device name is /dev/xvdf and the mount point is /data
+    DATA_DEVICE="/dev/sdb"
+    MOUNT_POINT="/local1"
+    # Create the mount point directory
+    mkdir -p ${MOUNT_POINT}
+    # Format the EBS volume with the XFS file system
+    mkfs -t xfs ${DATA_DEVICE}
+    # Mount the EBS volume
+    mount ${DATA_DEVICE} ${MOUNT_POINT}
+    # Ensure the EBS volume is mounted on reboot
+    echo "${DATA_DEVICE} ${MOUNT_POINT} xfs defaults,nofail 0 2" >> /etc/fstab   
+  detailedMonitoring: true
