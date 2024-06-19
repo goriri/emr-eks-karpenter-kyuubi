@@ -53,3 +53,7 @@ chmod +x start-job-run-test.sh
 ```
 
 ## Step 5 Create Pod Templates
+```
+aws s3 cp driver-pod-template.yaml s3://${S3_BUCKET}/pod-template/
+aws s3 cp executor-pod-template.yaml s3://${S3_BUCKET}/pod-template/
+```
