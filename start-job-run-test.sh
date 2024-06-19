@@ -1,8 +1,8 @@
 aws emr-containers start-job-run \
---virtual-cluster-id ${EMRCLUSTER_NAME} \
+--virtual-cluster-id ${EMRCLUSTER_ID} \
 --name spark-pi \
 --execution-role-arn ${JOB_EXECUTION_ROLE_ARN} \
---release-label emr-6.2.0-latest \
+--release-label emr-6.10.0-latest \
 --job-driver '{
     "sparkSubmitJobDriver": {
         "entryPoint": "s3://aws-data-analytics-workshops/emr-eks-workshop/scripts/pi.py",
