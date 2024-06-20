@@ -16,7 +16,7 @@ priorityClass:
 # SA was created by scirpts/eks_provision.sh, update the script if needed
 serviceAccount:
   create: false
-  name: kyuubi
+  name: ${KYUUBI_SA}
 
 # Allow Kyuubi create Spark Engine & pods in a different namespace "emr"
 engine:
