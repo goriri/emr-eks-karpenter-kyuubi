@@ -166,7 +166,7 @@ sparkConf:
     spark.hadoop.dynamodb.customAWSCredentialsProvider=com.amazonaws.auth.WebIdentityTokenCredentialsProvider
     spark.authenticate=true
     spark.kubernetes.driver.podTemplateFile=s3://${S3_BUCKET}/pod-template/driver-pod-template.yaml
-    spark.kubernetes.executor.podTemplateFile=s3:/${S3_BUCKET}/pod-template/executor-pod-template.yaml
+    spark.kubernetes.executor.podTemplateFile=s3://${S3_BUCKET}/pod-template/executor-pod-template.yaml
     spark.kubernetes.driver.podTemplateContainerName=spark-kubernetes-driver
     spark.kubernetes.executor.podTemplateContainerName=spark-kubernetes-executor
     spark.kubernetes.file.upload.path=s3://${S3_BUCKET}upload_files/

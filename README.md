@@ -77,8 +77,16 @@ kubectl get pods -n emr
 kubectl exec -it pod/kyuubi-0 -n emr -- bash
 ```
 ```
+# execute in the Kyuubi pod's shell. Spark submit test
+export S3_BUCKET="YOUR_BUCKET"
+aws s3 cp /usr/lib/spark/examples/jars/spark-examples s3://${S3_BUCKET}/jars
+
 /usr/lib/spark/bin/spark-submit \
 --class org.apache.spark.examples.SparkPi \
 --conf spark.executor.instances=5 \
- local:///usr/lib/spark/examples/jars/spark-examples.jar 10000
+ s3://${S3_BUCKET}/jars/spark-examples.jar 10000
+```
+```
+# beeline test
+./bin/beeline -u 'jdbc:hive2://kyuubi-0.kyuubi-headless.emr.svc.cluster.local:10009#spark.app.name=b1;' -n hadoop --hiveconf spark.kubernetes.file.upload.path=s3://${S3_BUCKET}/upload_files/ --hiveconf spark.executor.instances=4 --hiveconf spark.driver.memory=4G --hiveconf spark.driver.cores=4
 ```
