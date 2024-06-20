@@ -65,9 +65,20 @@ chmod +x start-job-run-pod-template.sh
 ## Step 6 Create Kyuubi Image and Deploy
 ```
 export ECR_URL=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-chmod build-kyuubi-docker.sh
+chmod +x build-kyuubi-docker.sh
 ./build-kyuubi-docker.sh
 
 envsubst < charts/my-kyuubi-values.yaml | helm install kyuubi charts/kyuubi -n emr --create-namespace -f - --debug
 kubectl get pods -n emr
+```
+
+## Step 7 Login the Kyuubi Pod and Test It
+```
+kubectl exec -it pod/kyuubi-0 -n emr -- bash
+```
+```
+/usr/lib/spark/bin/spark-submit \
+--class org.apache.spark.examples.SparkPi \
+--conf spark.executor.instances=5 \
+ local:///usr/lib/spark/examples/jars/spark-examples.jar 10000
 ```
