@@ -124,7 +124,6 @@ sparkConf:
   sparkDefaults: |
     spark.submit.deployMode=cluster
     spark.kubernetes.namespace=emr
-    spark.kubernetes.authenticate.serviceAccountName=cross-ns-kyuubi
     spark.kubernetes.authenticate.driver.serviceAccountName=emr-kyuubi
     spark.kubernetes.container.image=public.ecr.aws/emr-on-eks/spark/emr-6.10.0:latest
     spark.kubernetes.driver.container.image=public.ecr.aws/emr-on-eks/spark/emr-6.10.0:latest
