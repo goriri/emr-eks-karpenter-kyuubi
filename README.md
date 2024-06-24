@@ -63,11 +63,19 @@ chmod +x start-job-run-pod-template.sh
 ```
 
 ## Step 6 Create Kyuubi Image and Deploy
+Option 1: Build your own Kyuubi image
 ```
 export ECR_URL=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 chmod +x build-kyuubi-docker.sh
 ./build-kyuubi-docker.sh
+```
+Option 2: Use the public image: public.ecr.aws/l2l6g0y5/emr-eks-kyuubi:6.10_180
+```
+aws ecr-public get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin public.ecr.aws
+export ECR_URL=public.ecr.aws/l2l6g0y5
+```
 
+```
 envsubst < charts/my-kyuubi-values.yaml | helm install kyuubi charts/kyuubi -n emr --create-namespace -f - --debug
 kubectl get pods -n emr
 ```
