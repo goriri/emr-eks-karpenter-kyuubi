@@ -15,7 +15,7 @@
         },
         {
             "Effect": "Allow",
-            "Action": ["glue:*Table*", "glue:*Partition*", "glue:Get*"],
+            "Action": ["glue:*Table*", "glue:*Partition*", "glue:*Database*"],
             "Resource": [ "arn:aws:glue:*:*:*" ]
         }
     ]

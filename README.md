@@ -20,7 +20,8 @@ export JOB_EXECUTION_ROLE_NAME=${CLUSTER_NAME}-execution-role
 export JOB_EXECUTION_POLICY_NAME=${CLUSTER_NAME}-execution-policy
 export JOB_EXECUTION_ROLE_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/${JOB_EXECUTION_ROLE_NAME}
 
-export S3_BUCKET="YOUR_BUCKET"
+aws s3 mb s3://emr-eks-$AWS_ACCOUNT_ID
+export S3_BUCKET=emr-eks-$AWS_ACCOUNT_ID
 export EMR_NAMESPACE=emr
 <!-- export KYUUBI_NAMESPACE=kyuubi -->
 export KYUUBI_SA=emr-kyuubi
@@ -29,7 +30,6 @@ chmod +x job-execution-role.sh
 ./job-execution-role.sh
 ```
 Create the ebs controller service account 
-Is this needed? cross account kyuubi execution service account
 ```
 envsubst < service-accounts.yaml | eksctl create iamserviceaccount --config-file=- --approve
 ```
@@ -45,7 +45,7 @@ envsubst < karpenter-emr-nodepool.yaml | kubectl apply -f -
 ```
 
 ## Step 4 Test The Vanilla Job Run
-Please replace the EMRCLUSTER_ID with your EMR virtual cluster ID
+Please replace the EMRCLUSTER_ID with your EMR virtual cluster ID (can be found in the console EMR/EMR on EKS/Virtual Clusters)
 ```
 export EMRCLUSTER_ID=ekjfutq5yadjc6626hmptqiq1
 chmod +x start-job-run.sh
@@ -71,7 +71,7 @@ chmod +x build-kyuubi-docker.sh
 ```
 Option 2: Use the public image: public.ecr.aws/l2l6g0y5/emr-eks-kyuubi:6.10_180
 ```
-aws ecr-public get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin public.ecr.aws
+aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws
 export ECR_URL=public.ecr.aws/l2l6g0y5
 ```
 Deploy the helm chart
